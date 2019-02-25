@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -73,7 +74,7 @@ func (store *Store) Get(key string) (string, bool, error) {
 		case string:
 			return typed, true, nil
 		case int:
-			return string(typed), true, nil
+			return strconv.Itoa(typed), true, nil
 		default:
 			return "", false, fmt.Errorf("miniredis: cant return %q as string", typed)
 		}
@@ -105,4 +106,41 @@ func (store *Store) del(key string) bool {
 	}
 
 	return false
+}
+
+func (store *Store) DbSize() int {
+	count := 0
+	store.values.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+
+	return count
+}
+
+func (store *Store) Incr(key string) (int, error) {
+	unlock := store.LockKey(key)
+	defer unlock()
+
+	actual, _ := store.values.LoadOrStore(key, 0)
+
+	var num int
+	switch typed := actual.(type) {
+	case int:
+		num = typed
+	case string:
+		value, err := strconv.Atoi(typed)
+		if err != nil {
+			return 0, fmt.Errorf("miniredis: conversion of %q to integer failed with message %q", typed, err)
+		}
+
+		num = value
+	default:
+		return 0, fmt.Errorf("miniredis: cant convert value %q to integer", typed)
+	}
+
+	num++
+	store.values.Store(key, num)
+
+	return num, nil
 }

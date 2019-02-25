@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -91,7 +92,7 @@ func assertGet(t *testing.T, store *Store, key, expected string, expectedOk, fou
 	actual, ok, err := store.Get(key)
 
 	if actual != expected {
-		t.Errorf("expected %v, got %v", expected, actual)
+		t.Errorf("expected %q, got %q", expected, actual)
 	}
 
 	if ok != expectedOk {
@@ -103,4 +104,60 @@ func assertGet(t *testing.T, store *Store, key, expected string, expectedOk, fou
 	} else if !foundErr && err != nil {
 		t.Errorf("expected nil, got %q", err)
 	}
+}
+
+func TestDbSize(t *testing.T) {
+	store := new(Store)
+	store.Set("foo", "br")
+	store.Set("fizz", "buzz")
+	store.Set("foo", "bar")
+
+	t.Run("get the store size", func(t *testing.T) {
+		count := store.DbSize()
+		if expected := 2; count != expected {
+			t.Errorf("expected %v, got %v", expected, count)
+		}
+	})
+}
+
+func TestIncr(t *testing.T) {
+	store := new(Store)
+	store.Set("bar", "4")
+	store.Set("fizz", "buzz")
+
+	t.Run("increment non existing key", func(t *testing.T) {
+		num, _ := store.Incr("foo")
+		if expected := 1; num != expected {
+			t.Errorf("expected %v, got %v", expected, num)
+		}
+	})
+
+	t.Run("increment existing key", func(t *testing.T) {
+		num, _ := store.Incr("bar")
+		if expected := 5; num != expected {
+			t.Errorf("expected %v, got %v", expected, num)
+		}
+	})
+
+	t.Run("increment invalid key", func(t *testing.T) {
+		_, err := store.Incr("fizz")
+		if err == nil {
+			t.Errorf("expected error, got nil")
+		}
+	})
+
+	t.Run("increment key in multiple goroutines", func(t *testing.T) {
+		wg := new(sync.WaitGroup)
+		for x := 0; x < 1000; x++ {
+			wg.Add(1)
+
+			go func() {
+				store.Incr("xyz")
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
+		assertGet(t, store, "xyz", "1000", true, false)
+	})
 }
