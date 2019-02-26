@@ -144,3 +144,76 @@ func (store *Store) Incr(key string) (int, error) {
 
 	return num, nil
 }
+
+func (store *Store) ZAdd(key string, sets ...SortedSetItem) (int, error) {
+	unlock := store.LockKey(key)
+	defer unlock()
+
+	actual, _ := store.values.LoadOrStore(key, MakeSortedSet())
+
+	var sortedSet *SortedSet
+	switch typed := actual.(type) {
+	case *SortedSet:
+		sortedSet = typed
+	default:
+		return 0, fmt.Errorf("miniredis: key %q value is not a sorted set: %q", key, typed)
+	}
+
+	count := 0
+	for _, set := range sets {
+		if sortedSet.Set(set.Score, set.Member) {
+			count++
+		}
+	}
+
+	return count, nil
+}
+
+func (store *Store) ZCard(key string) (int, error) {
+	unlock := store.LockKey(key)
+	defer unlock()
+
+	if actual, ok := store.values.Load(key); ok {
+		switch typed := actual.(type) {
+		case *SortedSet:
+			return typed.Len(), nil
+		default:
+			return 0, fmt.Errorf("miniredis: key %q value is not a sorted set: %q", key, typed)
+		}
+	}
+
+	return 0, nil
+}
+
+func (store *Store) ZRank(key, member string) (int, bool, error) {
+	unlock := store.LockKey(key)
+	defer unlock()
+
+	if actual, ok := store.values.Load(key); ok {
+		switch typed := actual.(type) {
+		case *SortedSet:
+			index, ok := typed.Position(member)
+			return index, ok, nil
+		default:
+			return 0, false, fmt.Errorf("miniredis: key %q value is not a sorted set: %q", key, typed)
+		}
+	}
+
+	return 0, false, nil
+}
+
+func (store *Store) ZRange(key string, start, stop int) ([]SortedSetItem, error) {
+	unlock := store.LockKey(key)
+	defer unlock()
+
+	if actual, ok := store.values.Load(key); ok {
+		switch typed := actual.(type) {
+		case *SortedSet:
+			return typed.Slice(start, stop), nil
+		default:
+			return nil, fmt.Errorf("miniredis: key %q value is not a sorted set: %q", key, typed)
+		}
+	}
+
+	return []SortedSetItem{}, nil
+}
