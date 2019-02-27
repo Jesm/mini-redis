@@ -155,5 +155,5 @@ func scanVars(regex *regexp.Regexp, str string, keys ...string) []string {
 }
 
 func errorReturn(cmd string) (interface{}, error) {
-	return nil, fmt.Errorf("miniredis: cant handle command %q", cmd)
+	return nil, fmt.Errorf("miniredis: invalid command %q", cmd)
 }

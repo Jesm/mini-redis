@@ -6,5 +6,8 @@ COPY . /go/src/miniredis/
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o /go/bin/miniredis miniredis
 
 FROM scratch
+
 COPY --from=build /go/bin/miniredis /go/bin/miniredis
+
+EXPOSE 8080
 ENTRYPOINT ["/go/bin/miniredis"]
