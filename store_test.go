@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -16,11 +17,11 @@ func TestSet(t *testing.T) {
 
 func setTestAux(t *testing.T, store *Store, name, key, value string) {
 	t.Run(name, func(t *testing.T) {
-		ok, err := store.Set(key, value)
-		if !ok {
-			t.Errorf("expected true, got false")
-		}
-		if err != nil {
+		if ok, err := store.Set(key, value); err == nil {
+			if !ok {
+				t.Errorf("expected true, got false")
+			}
+		} else {
 			t.Errorf("expected nil, got %q", err)
 		}
 
@@ -159,5 +160,89 @@ func TestIncr(t *testing.T) {
 
 		wg.Wait()
 		assertGet(t, store, "xyz", "1000", true, false)
+	})
+}
+
+func TestZAdd(t *testing.T) {
+	store := new(Store)
+	store.Set("foo", "bar")
+
+	t.Run("add to non existing key", func(t *testing.T) {
+		if count, err := store.ZAdd("fizz", SortedSetItem{8, "eight"}); err == nil {
+			if expected := 1; count != expected {
+				t.Errorf("expected %v, got %v", expected, count)
+			}
+		} else {
+			t.Errorf("expected nil, got %q", err)
+		}
+	})
+
+	t.Run("add to key with invalid value", func(t *testing.T) {
+		if _, err := store.ZAdd("foo", SortedSetItem{4, "four"}); err == nil {
+			t.Errorf("expected error, got nil")
+		}
+	})
+}
+
+func TestZCard(t *testing.T) {
+	store := new(Store)
+	store.Set("foo", "bar")
+
+	t.Run("get cardinality of non existing key", func(t *testing.T) {
+		if count, err := store.ZCard("fizz"); err == nil {
+			if expected := 0; count != expected {
+				t.Errorf("expected %v, got %v", expected, count)
+			}
+		} else {
+			t.Errorf("expected nil, got %q", err)
+		}
+	})
+
+	t.Run("get cardinality of key with invalid value", func(t *testing.T) {
+		if _, err := store.ZCard("foo"); err == nil {
+			t.Errorf("expected error, got nil")
+		}
+	})
+}
+
+func TestZRank(t *testing.T) {
+	store := new(Store)
+	store.Set("foo", "bar")
+
+	t.Run("get rank of non existing key", func(t *testing.T) {
+		if _, ok, err := store.ZRank("fizz", "member"); err == nil {
+			if ok {
+				t.Errorf("expected false, got true")
+			}
+		} else {
+			t.Errorf("expected nil, got %q", err)
+		}
+	})
+
+	t.Run("get rank of key with invalid value", func(t *testing.T) {
+		if _, _, err := store.ZRank("foo", "member"); err == nil {
+			t.Errorf("expected error, got nil")
+		}
+	})
+}
+
+func TestZRange(t *testing.T) {
+	store := new(Store)
+	store.Set("foo", "bar")
+
+	t.Run("get rank of non existing key", func(t *testing.T) {
+		if arr, err := store.ZRange("fizz", 0, 1); err == nil {
+			if expected := []SortedSetItem{}; !reflect.DeepEqual(expected, arr) {
+				t.Errorf("expected %v, got %v", expected, arr)
+			}
+		} else {
+			t.Errorf("expected nil, got %q", err)
+		}
+	})
+
+	t.Run("get range of key with invalid value", func(t *testing.T) {
+		if _, err := store.ZRange("foo", 0, 2); err == nil {
+			t.Errorf("expected error, got nil")
+		}
 	})
 }

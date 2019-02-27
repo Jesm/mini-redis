@@ -76,7 +76,7 @@ func (store *Store) Get(key string) (string, bool, error) {
 		case int:
 			return strconv.Itoa(typed), true, nil
 		default:
-			return "", false, fmt.Errorf("miniredis: cant return %q as string", typed)
+			return "", false, fmt.Errorf("miniredis: cant return %v of type %T as string", typed, typed)
 		}
 	}
 
